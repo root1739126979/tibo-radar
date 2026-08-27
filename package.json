@@ -1,0 +1,17 @@
+{
+  "name": "tibo-radar",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cloud Tibo reset-signal monitoring plus local Codex weekly quota tracking.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test",
+    "status": "node src/status.js",
+    "sample": "node src/sample.js",
+    "doctor": "node src/doctor.js",
+    "cloud:dry-run": "node src/cloud-monitor.js --dry-run"
+  }
+}
