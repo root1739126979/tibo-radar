@@ -7,30 +7,37 @@ import { notifyWindows } from './notify-windows.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export async function sampleQuota() {
-  return withFileLock(lockPath, async () => {
-    const state = await readJson(statePath, { version: 1, lastSample: null, lastResetEvent: null });
-    const raw = await readAccountRateLimits();
-    const sample = normalizeQuotaSample(raw);
+const defaultPaths = { dataDirectory, errorsPath, eventsPath, historyPath, lockPath, statePath };
+
+export async function sampleQuota({
+  paths = defaultPaths,
+  readRateLimits = readAccountRateLimits,
+  notify = notifyWindows,
+  now = () => new Date()
+} = {}) {
+  return withFileLock(paths.lockPath, async () => {
+    const state = await readJson(paths.statePath, { version: 1, lastSample: null, lastResetEvent: null });
+    const raw = await readRateLimits();
+    const sample = normalizeQuotaSample(raw, now());
     const event = detectQuotaReset(state.lastSample, sample);
 
-    await appendJsonLine(historyPath, sample);
+    await appendJsonLine(paths.historyPath, sample);
     if (event) {
-      await appendJsonLine(eventsPath, event);
+      await appendJsonLine(paths.eventsPath, event);
       state.lastResetEvent = event;
     }
     state.lastSample = sample;
     state.updatedAt = new Date().toISOString();
-    await writeJsonAtomic(statePath, state);
+    await writeJsonAtomic(paths.statePath, state);
 
     if (event) {
       try {
-        await notifyWindows('Tibo Radar：配额已经重置', `重置到来时还有 ${event.unusedPercentBeforeReset}% 周配额未使用。`);
+        await notify('Tibo Radar：配额已经重置', `重置到来时还有 ${event.unusedPercentBeforeReset}% 周配额未使用。`);
       } catch (error) {
-        await appendError(errorsPath, `Desktop notification failed after reset event was recorded: ${error.message}`);
+        await appendError(paths.errorsPath, `Desktop notification failed after reset event was recorded: ${error.message}`);
       }
     }
-    return { sample, event, dataDirectory };
+    return { sample, event, dataDirectory: paths.dataDirectory };
   });
 }
 
