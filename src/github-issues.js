@@ -47,6 +47,7 @@ export async function createIssueOnce({ repository, token, signal, assignee }) {
 
   const completed = signal.phase === 'completed';
   const title = completed ? 'Tibo 已经进行了重置' : 'Tibo 即将进行重置';
+  const quotedText = signal.text.replaceAll('@', '@\u200b').replaceAll('\n', '\n> ');
   const body = [
     marker,
     `## ${title}`,
@@ -59,7 +60,7 @@ export async function createIssueOnce({ repository, token, signal, assignee }) {
     '',
     '### Tibo 原文',
     '',
-    `> ${signal.text.replaceAll('\n', '\n> ')}`
+    `> ${quotedText}`
   ].filter((line) => line !== null).join('\n');
 
   const issue = await githubRequest(`/repos/${owner}/${name}/issues`, {

@@ -32,6 +32,14 @@ test('does not treat a joking reset question as a completed reset', () => {
   assert.deepEqual(signals, []);
 });
 
+test('does not treat an unrelated product launch as a reset hint', () => {
+  const signals = classifyFeed({ stale: false, tweets: [{
+    id: 'launch-1', at: '2026-08-27T05:53:43Z', url: 'https://x.com/thsottiaux/status/launch-1',
+    text: 'The new feature should land tomorrow.', explicit_reset_claim: false, tibo_lane: 'other'
+  }] }, { now });
+  assert.deepEqual(signals, []);
+});
+
 test('accepts an independently reported completed event and deduplicates by key', () => {
   const runway = classifyRunway({ monitor: { status: 'ok' }, events: [{
     kind: 'reset_completed', announcedAt: '2026-08-27T16:35:05Z', confidence: 0.95,

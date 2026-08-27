@@ -24,7 +24,11 @@ export async function sampleQuota() {
     await writeJsonAtomic(statePath, state);
 
     if (event) {
-      await notifyWindows('Tibo Radar：配额已经重置', `重置到来时还有 ${event.unusedPercentBeforeReset}% 周配额未使用。`);
+      try {
+        await notifyWindows('Tibo Radar：配额已经重置', `重置到来时还有 ${event.unusedPercentBeforeReset}% 周配额未使用。`);
+      } catch (error) {
+        await appendError(errorsPath, `Desktop notification failed after reset event was recorded: ${error.message}`);
+      }
     }
     return { sample, event, dataDirectory };
   });

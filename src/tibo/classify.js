@@ -3,8 +3,7 @@ const UPCOMING_PATTERNS = [
   /\breset\s+(?:is\s+)?incoming\b/i,
   /\breset(?:ting)?\s+(?:them\s+)?(?:later|tomorrow|soon|in a bit)\b/i,
   /\b(?:later|tomorrow|soon|in a bit).{0,60}\breset\b/i,
-  /\bfind\s+(?:the\s+)?reset\s+button\s+tomorrow\b/i,
-  /\bshould\s+(?:land|arrive)\b/i
+  /\bfind\s+(?:the\s+)?reset\s+button\s+tomorrow\b/i
 ];
 
 const COMPLETED_PATTERNS = [
@@ -51,9 +50,12 @@ export function classifyFeed(feed, { now = new Date(), maxAgeHours = 72 } = {}) 
     const text = String(tweet?.text ?? '');
     if (!id || !withinAge(at, now, maxAgeHours)) continue;
 
-    const explicit = tweet.explicit_reset_claim === true || COMPLETED_PATTERNS.some((pattern) => pattern.test(text));
+    const laneIsRelevant = tweet.tibo_lane === 'reset_announcement' || tweet.tibo_lane === 'reset_related';
+    const textHasResetContext = /\b(?:codex|chatgpt work|usage|quota|rate limits?|reset button|everyone|all paid|brand new usage)\b/i.test(text);
+    const explicit = tweet.explicit_reset_claim === true
+      || (!/\?\s*$/.test(text) && (laneIsRelevant || textHasResetContext) && COMPLETED_PATTERNS.some((pattern) => pattern.test(text)));
     const teasing = tweet?.tease_classification?.teasing === true
-      || UPCOMING_PATTERNS.some((pattern) => pattern.test(text));
+      || ((laneIsRelevant || textHasResetContext) && UPCOMING_PATTERNS.some((pattern) => pattern.test(text)));
 
     if (explicit) {
       signals.push(makeSignal({
