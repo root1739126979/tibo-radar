@@ -28,7 +28,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\uninstall-windows-task.ps1
 
 ## 云端提醒
 
-仓库的 `Tibo reset monitor` GitHub Actions 每 10 分钟读取两个公开结构化信号源。识别到新提示或完成事件时，它会创建一个带 `tibo-radar` 标签的 Issue；事件键写入 Issue，因此重复运行不会重复提醒。
+仓库的 `Tibo reset monitor` GitHub Actions 每 5 分钟读取两个公开结构化信号源。识别到新提示或完成事件时，它会创建一个带 `tibo-radar` 标签的 Issue；事件键写入 Issue，因此重复运行不会重复提醒。
 
 ## 检查
 
