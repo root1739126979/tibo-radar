@@ -15,10 +15,11 @@ if ($source -match '(?i)(?:--body|-b)\s+\$SendKey') {
 $localPosition = $source.IndexOf('[本机测试]')
 $cloudPosition = $source.IndexOf('serverchan-smoke-test')
 $enabledPosition = $source.IndexOf('SERVERCHAN_ENABLED_AT')
-if ($localPosition -lt 0 -or $cloudPosition -lt 0 -or $enabledPosition -lt 0) {
+$retentionPosition = $source.IndexOf('artifact-and-log-retention')
+if ($localPosition -lt 0 -or $cloudPosition -lt 0 -or $retentionPosition -lt 0 -or $enabledPosition -lt 0) {
     throw 'Both smoke tests and the enable watermark are required.'
 }
-if ($enabledPosition -lt $localPosition -or $enabledPosition -lt $cloudPosition) {
+if ($enabledPosition -lt $localPosition -or $enabledPosition -lt $cloudPosition -or $enabledPosition -lt $retentionPosition) {
     throw 'Enable watermark must be written only after both smoke tests.'
 }
 if ($source -match 'sctp[0-9]+t[A-Za-z0-9_-]{6,}') {

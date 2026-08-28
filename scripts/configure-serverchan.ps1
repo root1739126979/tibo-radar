@@ -60,6 +60,9 @@ try {
     & $GhPath run watch $run.databaseId --repo $Repository --exit-status
     if ($LASTEXITCODE -ne 0) { throw '[云端测试] 发送失败。' }
 
+    & $GhPath api --method PUT "repos/$Repository/actions/permissions/artifact-and-log-retention" -F days=30 1>$null
+    if ($LASTEXITCODE -ne 0) { throw 'GitHub Actions 日志保留期配置失败。' }
+
     $enabledAt = [DateTime]::UtcNow.ToString('o')
     & $GhPath variable set SERVERCHAN_ENABLED_AT --repo $Repository --body $enabledAt
     if ($LASTEXITCODE -ne 0) { throw '启用时间水位写入失败。' }
