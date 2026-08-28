@@ -3,6 +3,7 @@
 )
 
 $ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Security
 if ($Repository -ne 'root1739126979/tibo-radar') {
     throw 'Repository is fixed to root1739126979/tibo-radar.'
 }

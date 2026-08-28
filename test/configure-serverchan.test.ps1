@@ -3,6 +3,12 @@ $projectDirectory = Split-Path -Parent $PSScriptRoot
 $scriptPath = Join-Path $projectDirectory 'scripts\configure-serverchan.ps1'
 $source = Get-Content -Raw -LiteralPath $scriptPath
 
+$assemblyLoadPosition = $source.IndexOf('Add-Type -AssemblyName System.Security')
+$protectPosition = $source.IndexOf('[Security.Cryptography.ProtectedData]::Protect')
+if ($assemblyLoadPosition -lt 0 -or $protectPosition -lt 0 -or $assemblyLoadPosition -gt $protectPosition) {
+    throw 'Windows PowerShell must load System.Security before resolving ProtectedData.'
+}
+
 if ($source -notmatch [regex]::Escape("`$Repository = 'root1739126979/tibo-radar'")) {
     throw 'Configuration does not pin the intended GitHub repository.'
 }
