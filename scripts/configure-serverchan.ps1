@@ -53,9 +53,17 @@ try {
     $requestId = [Guid]::NewGuid().ToString('N')
     & $GhPath workflow run tibo-monitor.yml --repo $Repository -f mode=serverchan-smoke-test -f "request_id=$requestId"
     if ($LASTEXITCODE -ne 0) { throw '[云端测试] 工作流触发失败。' }
-    Start-Sleep -Seconds 3
-    $run = & $GhPath run list --repo $Repository --workflow tibo-monitor.yml --event workflow_dispatch --json databaseId,displayTitle,url --limit 20 |
-        ConvertFrom-Json | Where-Object { $_.displayTitle -like "*$requestId*" } | Select-Object -First 1
+    $runDeadline = (Get-Date).AddMinutes(2)
+    $expectedRunName = "Tibo reset monitor / serverchan-smoke-test / $requestId"
+    $run = $null
+    do {
+        $runsJson = & $GhPath run list --repo $Repository --workflow tibo-monitor.yml --event workflow_dispatch --json databaseId,displayTitle,url --limit 20
+        if ($LASTEXITCODE -ne 0) { throw '[云端测试] 工作流查询失败。' }
+        $runs = $runsJson | ConvertFrom-Json
+        $run = @($runs) | Where-Object { $_.displayTitle -eq $expectedRunName } | Select-Object -First 1
+        if ($run) { break }
+        Start-Sleep -Seconds 2
+    } while ((Get-Date) -lt $runDeadline)
     if (-not $run) { throw '[云端测试] 无法定位对应的工作流运行。' }
     & $GhPath run watch $run.databaseId --repo $Repository --exit-status
     if ($LASTEXITCODE -ne 0) { throw '[云端测试] 发送失败。' }

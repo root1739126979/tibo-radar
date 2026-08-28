@@ -12,6 +12,15 @@ if ($source -notmatch '(?s)\$SendKey\s*\|\s*&\s*\$GhPath\s+secret\s+set\s+SERVER
 if ($source -match '(?i)(?:--body|-b)\s+\$SendKey') {
     throw 'SendKey is exposed as a command-line argument.'
 }
+if ($source -match 'Start-Sleep\s+-Seconds\s+3') {
+    throw 'Cloud run discovery still relies on a fixed three-second sleep.'
+}
+if ($source -notmatch '(?s)\$runDeadline\s*=.*AddMinutes\(2\).*do\s*\{.*Start-Sleep\s+-Seconds\s+2.*\}\s*while.*\$runDeadline') {
+    throw 'Cloud run discovery must use bounded polling with an explicit interval.'
+}
+if ($source -notmatch '\$_.displayTitle\s+-eq\s+\$expectedRunName') {
+    throw 'Cloud run discovery does not match the exact request-id run name.'
+}
 $localPosition = $source.IndexOf('[本机测试]')
 $cloudPosition = $source.IndexOf('serverchan-smoke-test')
 $enabledPosition = $source.IndexOf('SERVERCHAN_ENABLED_AT')

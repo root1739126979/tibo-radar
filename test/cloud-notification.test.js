@@ -100,6 +100,20 @@ test('an unlabeled issue created after enablement resumes as pending after a cra
   assert.equal(store.records.get(item.key).appStatus, 'sent');
 });
 
+test('a fresh signal first discovered after enablement sends even when its post time is slightly earlier', async () => {
+  const item = signal({ key: 'upcoming:posted-before-enable', at: '2026-08-27T23:55:00Z' });
+  const store = memoryStore();
+  const sent = [];
+  await runCloudMonitor({
+    now: () => now,
+    env: { SERVERCHAN_ENABLED_AT: enabledAt, SERVERCHAN_SENDKEY: 'sctp123456tFAKE_secret' },
+    readSignals: async () => ({ signals: [item], warnings: [] }), issueStore: store,
+    send: async (message) => sent.push(message)
+  });
+  assert.equal(sent.length, 1);
+  assert.equal(store.records.get(item.key).appStatus, 'sent');
+});
+
 test('smoke-test mode sends only the cloud test and does not poll or migrate', async () => {
   const sent = [];
   const store = memoryStore();

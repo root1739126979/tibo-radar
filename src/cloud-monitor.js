@@ -45,7 +45,7 @@ export async function runCloudMonitor({
       const signalMs = Date.parse(signal.at);
       const stale = !Number.isFinite(signalMs) || now().getTime() - signalMs > TWO_HOURS_MS;
       const issueCreatedMs = Date.parse(record.createdAt ?? '');
-      const historical = signalMs < enabledMs || !Number.isFinite(issueCreatedMs) || issueCreatedMs < enabledMs;
+      const historical = !Number.isFinite(issueCreatedMs) || issueCreatedMs < enabledMs;
       const status = signal.phase === 'completed' || stale || historical ? 'expired' : 'pending';
       record = await store.setAppStatus(record, status);
     }
