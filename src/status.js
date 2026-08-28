@@ -8,6 +8,7 @@ import { readJson } from './storage.js';
 import { errorsPath, outboxPath, serverChanSecretPath, statePath } from './paths.js';
 import { isLocalServerChanConfigured } from './local-serverchan.js';
 import { redactServerChanSecret } from './serverchan.js';
+import { inspectCloudAppConfiguration, summarizeAppConfiguration } from './app-configuration-status.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -41,12 +42,13 @@ async function recentError() {
 }
 
 async function main() {
-  const [quotaResult, signalsResult, stateResult, taskResult, configuredResult, outboxResult, errorResult] = await Promise.all([
+  const [quotaResult, signalsResult, stateResult, taskResult, localConfigResult, cloudConfigResult, outboxResult, errorResult] = await Promise.all([
     safe(async () => normalizeQuotaSample(await readAccountRateLimits())),
     safe(() => readLiveSignals({ maxAgeHours: 168 })),
     safe(() => readJson(statePath, { lastResetEvent: null })),
     safe(scheduledTaskHealth),
     safe(() => isLocalServerChanConfigured(serverChanSecretPath)),
+    safe(() => inspectCloudAppConfiguration()),
     safe(() => readJson(outboxPath, { items: [] })),
     safe(recentError)
   ]);
@@ -70,7 +72,10 @@ async function main() {
     ? `最近真实重置：${localTime(reset.detectedAt)}，最近样本剩余 ${reset.unusedPercentBeforeReset}%`
     : `最近真实重置：${stateResult.ok ? '尚无本机事件记录' : '未知'}`);
   console.log(`计划任务：${taskResult.ok ? taskResult.value : '未知'}`);
-  console.log(`App 通知：${configuredResult.ok ? (configuredResult.value ? '已配置' : '未配置') : '未知'}`);
+  const appConfiguration = summarizeAppConfiguration(localConfigResult, cloudConfigResult);
+  console.log(`App 通知：${appConfiguration.overall}`);
+  console.log(`  本机密钥：${appConfiguration.local}`);
+  console.log(`  云端链路：${appConfiguration.cloud}`);
   const pending = outboxResult.ok && Array.isArray(outboxResult.value?.items)
     ? outboxResult.value.items.filter((item) => item.status === 'pending').length : null;
   console.log(`待发送通知：${pending ?? '未知'}`);
