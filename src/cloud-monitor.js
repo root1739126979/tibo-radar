@@ -33,14 +33,14 @@ export async function runCloudMonitor({
   });
   await store.ensureLabels();
   const enabledMs = Date.parse(env.SERVERCHAN_ENABLED_AT ?? '');
-  const appConfigured = Number.isFinite(enabledMs)
-    && typeof env.SERVERCHAN_SENDKEY === 'string'
+  const appEnabled = Number.isFinite(enabledMs);
+  const hasSendKey = typeof env.SERVERCHAN_SENDKEY === 'string'
     && env.SERVERCHAN_SENDKEY.trim().length > 0;
   const notifications = [];
   for (const signal of signals) {
     let record = await store.findOrCreate(signal);
     const created = record.created;
-    if (!appConfigured) {
+    if (!appEnabled) {
       notifications.push({ signal: signal.key, created, appStatus: record.appStatus, configured: false });
       continue;
     }
@@ -53,10 +53,14 @@ export async function runCloudMonitor({
       record = await store.setAppStatus(record, status);
     }
     if (record.appStatus === 'pending') {
+      if (!hasSendKey) {
+        notifications.push({ signal: signal.key, created, appStatus: record.appStatus, configured: false });
+        continue;
+      }
       await send(tiboMessage(signal));
       record = await store.setAppStatus(record, 'sent');
     }
-    notifications.push({ signal: signal.key, created, appStatus: record.appStatus, configured: true });
+    notifications.push({ signal: signal.key, created, appStatus: record.appStatus, configured: hasSendKey });
   }
   return { signals: signals.length, warnings, notifications };
 }

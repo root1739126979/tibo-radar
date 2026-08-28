@@ -114,7 +114,7 @@ test('a fresh signal first discovered after enablement sends even when its post 
   assert.equal(store.records.get(item.key).appStatus, 'sent');
 });
 
-test('a missing cloud SendKey leaves a fresh issue recoverable without failing the monitor', async () => {
+test('a missing cloud SendKey records fresh upcoming as pending and sends it after a late recovery', async () => {
   const store = memoryStore();
   const sent = [];
   const readSignals = async () => ({ signals: [signal()], warnings: [] });
@@ -123,16 +123,29 @@ test('a missing cloud SendKey leaves a fresh issue recoverable without failing t
     send: async (message) => sent.push(message)
   });
   assert.equal(first.notifications[0].configured, false);
-  assert.equal(store.records.get('upcoming:new').appStatus, undefined);
+  assert.equal(store.records.get('upcoming:new').appStatus, 'pending');
   assert.equal(sent.length, 0);
 
   await runCloudMonitor({
-    now: () => now,
+    now: () => new Date('2026-08-28T04:00:00.000Z'),
     env: { SERVERCHAN_ENABLED_AT: enabledAt, SERVERCHAN_SENDKEY: 'sctp123456tFAKE_secret' },
     readSignals, issueStore: store, send: async (message) => sent.push(message)
   });
   assert.equal(store.records.get('upcoming:new').appStatus, 'sent');
   assert.equal(sent.length, 1);
+});
+
+test('a missing enable watermark creates the Issue without migrating App state', async () => {
+  const store = memoryStore();
+  const result = await runCloudMonitor({
+    now: () => now,
+    env: { SERVERCHAN_SENDKEY: 'sctp123456tFAKE_secret' },
+    readSignals: async () => ({ signals: [signal()], warnings: [] }), issueStore: store,
+    send: async () => { throw new Error('must not send'); }
+  });
+  assert.equal(result.notifications[0].configured, false);
+  assert.equal(store.records.get('upcoming:new').appStatus, undefined);
+  assert.deepEqual(store.transitions, []);
 });
 
 test('smoke-test mode sends only the cloud test and does not poll or migrate', async () => {
