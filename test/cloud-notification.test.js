@@ -114,6 +114,27 @@ test('a fresh signal first discovered after enablement sends even when its post 
   assert.equal(store.records.get(item.key).appStatus, 'sent');
 });
 
+test('a missing cloud SendKey leaves a fresh issue recoverable without failing the monitor', async () => {
+  const store = memoryStore();
+  const sent = [];
+  const readSignals = async () => ({ signals: [signal()], warnings: [] });
+  const first = await runCloudMonitor({
+    now: () => now, env: { SERVERCHAN_ENABLED_AT: enabledAt }, readSignals, issueStore: store,
+    send: async (message) => sent.push(message)
+  });
+  assert.equal(first.notifications[0].configured, false);
+  assert.equal(store.records.get('upcoming:new').appStatus, undefined);
+  assert.equal(sent.length, 0);
+
+  await runCloudMonitor({
+    now: () => now,
+    env: { SERVERCHAN_ENABLED_AT: enabledAt, SERVERCHAN_SENDKEY: 'sctp123456tFAKE_secret' },
+    readSignals, issueStore: store, send: async (message) => sent.push(message)
+  });
+  assert.equal(store.records.get('upcoming:new').appStatus, 'sent');
+  assert.equal(sent.length, 1);
+});
+
 test('smoke-test mode sends only the cloud test and does not poll or migrate', async () => {
   const sent = [];
   const store = memoryStore();

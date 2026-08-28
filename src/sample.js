@@ -25,12 +25,13 @@ export async function sampleQuota({
     const raw = await readRateLimits();
     const sample = normalizeQuotaSample(raw, now());
     const event = detectQuotaReset(state.lastSample, sample);
+    const resetNotification = event ? formatQuotaResetNotification(event) : null;
 
     await appendJsonLine(paths.historyPath, sample);
     if (event) {
       await appendJsonLine(paths.eventsPath, event);
       state.lastResetEvent = event;
-      await enqueueNotification(paths.outboxPath, { eventKey: event.key, ...formatQuotaResetNotification(event) }, { now: new Date(event.detectedAt) });
+      await enqueueNotification(paths.outboxPath, { eventKey: event.key, ...resetNotification }, { now: new Date(event.detectedAt) });
     }
     state.lastSample = sample;
     state.updatedAt = new Date().toISOString();
@@ -42,7 +43,7 @@ export async function sampleQuota({
 
     if (event) {
       try {
-        await notify('Tibo Radar：配额已经重置', `重置到来时还有 ${event.unusedPercentBeforeReset}% 周配额未使用。`);
+        await notify(resetNotification.title, resetNotification.body);
       } catch (error) {
         await appendError(paths.errorsPath, `Desktop notification failed after reset event was recorded: ${error.message}`);
       }

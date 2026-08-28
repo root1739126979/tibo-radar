@@ -82,3 +82,25 @@ test('records reset before App delivery, preserves failures, and retries one pen
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test('desktop reset notification does not claim an old sample was the instant balance', async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'tibo-radar-test-'));
+  const paths = {
+    dataDirectory: directory, statePath: path.join(directory, 'state.json'),
+    historyPath: path.join(directory, 'history.jsonl'), eventsPath: path.join(directory, 'events.jsonl'),
+    errorsPath: path.join(directory, 'errors.log'), lockPath: path.join(directory, 'sample.lock'),
+    outboxPath: path.join(directory, 'outbox.json'), serverChanSecretPath: path.join(directory, 'serverchan.dpapi')
+  };
+  const responses = [payload(72, 1_800_000_000), payload(1, 1_800_604_800)];
+  const times = [new Date('2026-01-01T00:00:00Z'), new Date('2026-01-01T03:00:00Z')];
+  const notifications = [];
+  try {
+    await sampleQuota({ paths, readRateLimits: async () => responses.shift(), now: () => times.shift(), notify: async (...args) => notifications.push(args), appConfigured: async () => false });
+    await sampleQuota({ paths, readRateLimits: async () => responses.shift(), now: () => times.shift(), notify: async (...args) => notifications.push(args), appConfigured: async () => false });
+    assert.match(notifications[0][1], /最近已知剩余 28%/);
+    assert.match(notifications[0][1], /无法精确确认重置瞬间余额/);
+    assert.doesNotMatch(notifications[0][1], /重置到来时还有/);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});

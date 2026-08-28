@@ -33,11 +33,14 @@ export async function runCloudMonitor({
   });
   await store.ensureLabels();
   const enabledMs = Date.parse(env.SERVERCHAN_ENABLED_AT ?? '');
+  const appConfigured = Number.isFinite(enabledMs)
+    && typeof env.SERVERCHAN_SENDKEY === 'string'
+    && env.SERVERCHAN_SENDKEY.trim().length > 0;
   const notifications = [];
   for (const signal of signals) {
     let record = await store.findOrCreate(signal);
     const created = record.created;
-    if (!Number.isFinite(enabledMs)) {
+    if (!appConfigured) {
       notifications.push({ signal: signal.key, created, appStatus: record.appStatus, configured: false });
       continue;
     }
