@@ -1,17 +1,45 @@
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import readline from 'node:readline';
 
 const INITIALIZE_ID = 1;
 const RATE_LIMITS_ID = 2;
 
-function codexExecutable() {
-  if (process.env.CODEX_BIN) return process.env.CODEX_BIN;
-  return process.platform === 'win32' ? 'codex.exe' : 'codex';
+export function resolveCodexExecutable({
+  env = process.env,
+  platform = process.platform,
+  arch = process.arch,
+  pathExists = existsSync
+} = {}) {
+  if (env.CODEX_BIN) return env.CODEX_BIN;
+  if (platform !== 'win32') return 'codex';
+
+  const packageVariants = [
+    { arch: 'x64', packageName: 'codex-win32-x64', target: 'x86_64-pc-windows-msvc' },
+    { arch: 'arm64', packageName: 'codex-win32-arm64', target: 'aarch64-pc-windows-msvc' }
+  ].sort((left, right) => Number(right.arch === arch) - Number(left.arch === arch));
+  const npmRoots = [
+    env.APPDATA ? path.win32.join(env.APPDATA, 'npm', 'node_modules') : null,
+    env.NPM_CONFIG_PREFIX ? path.win32.join(env.NPM_CONFIG_PREFIX, 'node_modules') : null
+  ].filter(Boolean);
+
+  for (const npmRoot of npmRoots) {
+    for (const variant of packageVariants) {
+      const candidate = path.win32.join(
+        npmRoot,
+        '@openai', 'codex', 'node_modules', '@openai', variant.packageName,
+        'vendor', variant.target, 'bin', 'codex.exe'
+      );
+      if (pathExists(candidate)) return candidate;
+    }
+  }
+  return 'codex.exe';
 }
 
 export function readAccountRateLimits({ timeoutMs = 15_000 } = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(codexExecutable(), ['app-server', '--stdio'], {
+    const child = spawn(resolveCodexExecutable(), ['app-server', '--stdio'], {
       env: process.env,
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true
