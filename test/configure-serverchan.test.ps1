@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 $projectDirectory = Split-Path -Parent $PSScriptRoot
 $scriptPath = Join-Path $projectDirectory 'scripts\configure-serverchan.ps1'
 $source = Get-Content -Raw -LiteralPath $scriptPath
