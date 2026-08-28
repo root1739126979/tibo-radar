@@ -3,6 +3,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Security
 $resolved = [System.IO.Path]::GetFullPath($SecretPath)
 $projectDirectory = Split-Path -Parent $PSScriptRoot
 $expected = [System.IO.Path]::GetFullPath((Join-Path $projectDirectory 'data\serverchan-sendkey.dpapi'))
