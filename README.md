@@ -31,7 +31,7 @@ npm run status
 powershell -ExecutionPolicy Bypass -File .\scripts\install-windows-task.ps1
 ```
 
-计划任务名为 `TiboRadarQuotaMonitor`，在当前用户登录后立即运行，之后每 10 分钟运行。失败后每分钟重试、最多三次；休眠时不唤醒电脑，恢复后补跑。异常退出遗留的采样锁超过三分钟后会安全回收。它通过无窗口的 Windows Script Host 运行，不会弹出控制台或抢占焦点。本地记录保存在未纳入 Git 的 `data/` 目录。卸载命令：
+计划任务名为 `TiboRadarQuotaMonitor`，在当前用户登录后立即运行，之后每 10 分钟运行。失败后每分钟重试、最多三次；休眠时不唤醒电脑，恢复后补跑。异常退出遗留的采样锁超过三分钟后会核对进程 PID 与启动时间再安全回收；若系统暂时无法核对，最多保守等待 30 分钟。它通过无窗口的 Windows Script Host 运行，不会弹出控制台或抢占焦点。本地记录保存在未纳入 Git 的 `data/` 目录。卸载命令：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\uninstall-windows-task.ps1
