@@ -5,10 +5,13 @@ param(
 $ErrorActionPreference = 'Stop'
 $projectDirectory = Split-Path -Parent $PSScriptRoot
 $sampleScript = Join-Path $projectDirectory 'src\sample.js'
-$runnerScript = Join-Path $PSScriptRoot 'run-sampler.ps1'
+$runnerScript = Join-Path $PSScriptRoot 'run-sampler-hidden.vbs'
 $nodePath = (Get-Command node.exe -ErrorAction Stop).Source
-if (-not (Test-Path -LiteralPath $sampleScript -PathType Leaf)) {
-    throw "Sample script not found: $sampleScript"
+$wscriptPath = Join-Path $env:SystemRoot 'System32\wscript.exe'
+foreach ($requiredFile in @($sampleScript, $runnerScript, $nodePath, $wscriptPath)) {
+    if (-not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
+        throw "Required file not found: $requiredFile"
+    }
 }
 $codexPath = (& where.exe codex 2>$null | Where-Object { $_ -like '*.exe' } | Select-Object -Last 1)
 if (-not $codexPath -or -not (Test-Path -LiteralPath $codexPath -PathType Leaf)) {
@@ -43,8 +46,8 @@ $trigger.Repetition.Duration = 'P3650D'
 $trigger.Repetition.StopAtDurationEnd = $false
 
 $action = $definition.Actions.Create(0)
-$action.Path = (Get-Command powershell.exe -ErrorAction Stop).Source
-$action.Arguments = '-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + $runnerScript + '" -NodePath "' + $nodePath + '" -CodexPath "' + $codexPath + '" -SampleScript "' + $sampleScript + '"'
+$action.Path = $wscriptPath
+$action.Arguments = '"' + $runnerScript + '" "' + $nodePath + '" "' + $codexPath + '" "' + $sampleScript + '"'
 $action.WorkingDirectory = $projectDirectory
 
 $null = $folder.RegisterTaskDefinition($TaskName, $definition, 6, $definition.Principal.UserId, $null, 3)

@@ -20,7 +20,7 @@ npm run status
 powershell -ExecutionPolicy Bypass -File .\scripts\install-windows-task.ps1
 ```
 
-计划任务名为 `TiboRadarQuotaMonitor`。本地记录保存在未纳入 Git 的 `data/` 目录。卸载命令：
+计划任务名为 `TiboRadarQuotaMonitor`，通过无窗口的 Windows Script Host 后台运行，不会弹出控制台或抢占焦点。本地记录保存在未纳入 Git 的 `data/` 目录。卸载命令：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\uninstall-windows-task.ps1
@@ -34,6 +34,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\uninstall-windows-task.ps1
 
 ```powershell
 npm test
+npm run test:windows-task
 npm run doctor
 npm run cloud:dry-run
 ```
