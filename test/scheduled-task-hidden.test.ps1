@@ -23,4 +23,19 @@ if ($runnerSource -notmatch '(?i)\.Run\(commandLine,\s*0,\s*True\)') {
     throw 'Hidden sampler runner does not force window style 0.'
 }
 
-Write-Output "PASS: $TaskName uses an invisible Windows Script Host action."
+$triggerTypes = @($task.Triggers | ForEach-Object { $_.CimClass.CimClassName })
+if (-not ($triggerTypes -contains 'MSFT_TaskLogonTrigger')) {
+    throw 'Scheduled task does not run when the current user logs on.'
+}
+$timeTrigger = $task.Triggers | Where-Object { $_.CimClass.CimClassName -eq 'MSFT_TaskTimeTrigger' } | Select-Object -First 1
+if (-not $timeTrigger -or $timeTrigger.Repetition.Interval -ne 'PT10M') {
+    throw 'Scheduled task does not repeat every 10 minutes.'
+}
+if ($task.Settings.RestartCount -ne 3 -or $task.Settings.RestartInterval -ne 'PT1M') {
+    throw 'Scheduled task does not retry three times at one-minute intervals.'
+}
+if ($task.Settings.WakeToRun) { throw 'Scheduled task must not wake a sleeping computer.' }
+if (-not $task.Settings.StartWhenAvailable) { throw 'Scheduled task must catch up after sleep or shutdown.' }
+if ($task.Settings.MultipleInstances -ne 2) { throw 'Scheduled task must ignore overlapping runs.' }
+
+Write-Output "PASS: $TaskName is hidden, starts at logon, repeats, catches up, and retries safely."
