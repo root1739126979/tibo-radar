@@ -12,3 +12,6 @@ export const historyPath = path.join(dataDirectory, 'quota-history.jsonl');
 export const eventsPath = path.join(dataDirectory, 'reset-events.jsonl');
 export const errorsPath = path.join(dataDirectory, 'errors.log');
 export const lockPath = path.join(dataDirectory, 'sample.lock');
+export const outboxPath = path.join(dataDirectory, 'notification-outbox.json');
+export const serverChanSecretPath = path.join(dataDirectory, 'serverchan-sendkey.dpapi');
+export const backupsDirectory = path.join(dataDirectory, 'backups');

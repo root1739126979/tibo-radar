@@ -4,6 +4,22 @@ on:
   schedule:
     - cron: '*/5 * * * *'
   workflow_dispatch:
+    inputs:
+      mode:
+        description: Execution mode
+        required: false
+        default: monitor
+        type: choice
+        options:
+          - monitor
+          - serverchan-smoke-test
+      request_id:
+        description: Correlation id for a smoke test
+        required: false
+        default: manual
+        type: string
+
+run-name: Tibo reset monitor / ${{ inputs.mode || 'monitor' }} / ${{ inputs.request_id || 'scheduled' }}
 
 permissions:
   contents: read
@@ -25,4 +41,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TIBO_RADAR_ASSIGNEE: ${{ vars.TIBO_RADAR_ASSIGNEE }}
+          TIBO_RADAR_MODE: ${{ inputs.mode || 'monitor' }}
+          SERVERCHAN_SENDKEY: ${{ secrets.SERVERCHAN_SENDKEY }}
+          SERVERCHAN_ENABLED_AT: ${{ vars.SERVERCHAN_ENABLED_AT }}
         run: node src/cloud-monitor.js

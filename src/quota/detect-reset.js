@@ -20,13 +20,31 @@ export function detectQuotaReset(previous, current) {
   if (!largeUsageDrop && !shiftedWindow) return null;
 
   return {
+    key: `quota-reset:${current.sampledAt}`,
     detectedAt: current.sampledAt,
     previousSampledAt: previous.sampledAt,
     unusedPercentBeforeReset: previous.remainingPercent,
     usedPercentBeforeReset: previous.usedPercent,
     usedPercentAfterReset: current.usedPercent,
+    currentRemainingPercent: current.remainingPercent,
     previousResetsAt: previous.resetsAt,
     currentResetsAt: current.resetsAt,
     evidence: largeUsageDrop ? 'usage_drop' : 'reset_time_shift'
+  };
+}
+
+export function formatQuotaResetNotification(event) {
+  const sampleAgeMs = Date.parse(event.detectedAt) - Date.parse(event.previousSampledAt);
+  const fresh = Number.isFinite(sampleAgeMs) && sampleAgeMs >= 0 && sampleAgeMs <= 20 * MINUTE_MS;
+  const balance = fresh
+    ? `重置前约剩余 ${event.unusedPercentBeforeReset}%（样本时间：${event.previousSampledAt}）`
+    : `最近已知剩余 ${event.unusedPercentBeforeReset}%（样本时间：${event.previousSampledAt}），无法精确确认重置瞬间余额`;
+  return {
+    title: '你的周配额已经重置',
+    body: [
+      `本机确认时间：${event.detectedAt}`,
+      balance,
+      `新周期当前剩余：${event.currentRemainingPercent}%`
+    ].join('\n')
   };
 }

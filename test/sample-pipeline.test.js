@@ -25,6 +25,8 @@ test('persists the pre-reset remainder and sends it to the notifier', async () =
     historyPath: path.join(directory, 'history.jsonl'),
     eventsPath: path.join(directory, 'events.jsonl'),
     errorsPath: path.join(directory, 'errors.log'),
+    outboxPath: path.join(directory, 'outbox.json'),
+    serverChanSecretPath: path.join(directory, 'serverchan.dpapi'),
     lockPath: path.join(directory, 'sample.lock')
   };
   const responses = [payload(72, 1_800_000_000), payload(1, 1_800_604_800)];
@@ -42,6 +44,40 @@ test('persists the pre-reset remainder and sends it to the notifier', async () =
     assert.equal(eventLines.length, 1);
     assert.equal(eventLines[0].unusedPercentBeforeReset, 28);
     assert.equal(historyLines.length, 2);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('records reset before App delivery, preserves failures, and retries one pending item', async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'tibo-radar-test-'));
+  const paths = {
+    dataDirectory: directory, statePath: path.join(directory, 'state.json'),
+    historyPath: path.join(directory, 'history.jsonl'), eventsPath: path.join(directory, 'events.jsonl'),
+    errorsPath: path.join(directory, 'errors.log'), lockPath: path.join(directory, 'sample.lock'),
+    outboxPath: path.join(directory, 'outbox.json'), serverChanSecretPath: path.join(directory, 'serverchan.dpapi')
+  };
+  const responses = [payload(72, 1_800_000_000), payload(1, 1_800_604_800), payload(2, 1_800_604_800)];
+  const times = [new Date('2026-01-01T00:00:00Z'), new Date('2026-01-01T00:10:00Z'), new Date('2026-01-01T00:20:00Z')];
+  let deliveries = 0;
+  try {
+    await sampleQuota({ paths, readRateLimits: async () => responses.shift(), now: () => times.shift(), notify: async () => {}, appConfigured: async () => true, deliverApp: async () => {} });
+    await assert.rejects(sampleQuota({
+      paths, readRateLimits: async () => responses.shift(), now: () => times.shift(), notify: async () => {},
+      appConfigured: async () => true,
+      deliverApp: async () => { deliveries += 1; throw new Error('temporary'); }
+    }), /remains pending/i);
+    const eventLines = (await readFile(paths.eventsPath, 'utf8')).trim().split('\n');
+    assert.equal(eventLines.length, 1);
+
+    await sampleQuota({
+      paths, readRateLimits: async () => responses.shift(), now: () => times.shift(), notify: async () => {},
+      appConfigured: async () => true, deliverApp: async () => { deliveries += 1; }
+    });
+    const outbox = JSON.parse(await readFile(paths.outboxPath, 'utf8'));
+    assert.equal(outbox.items[0].status, 'sent');
+    assert.equal(outbox.items[0].attempts, 2);
+    assert.equal(deliveries, 2);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

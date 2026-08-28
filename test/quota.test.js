@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeQuotaSample } from '../src/quota/normalize.js';
-import { detectQuotaReset } from '../src/quota/detect-reset.js';
+import { detectQuotaReset, formatQuotaResetNotification } from '../src/quota/detect-reset.js';
 
 test('normalizes the account-wide Codex weekly window', () => {
   const sample = normalizeQuotaSample({
@@ -41,4 +41,10 @@ test('does not misclassify a ten-minute sliding reset timestamp', () => {
     { sampledAt: '2026-01-01T00:00:00Z', usedPercent: 0, remainingPercent: 100, resetsAt: '2026-01-08T00:00:00Z' },
     { sampledAt: '2026-01-01T00:10:00Z', usedPercent: 0, remainingPercent: 100, resetsAt: '2026-01-08T00:10:00Z' }
   ), null);
+});
+
+test('describes a fresh pre-reset sample as approximate and an old one as last known', () => {
+  const event = { detectedAt: '2026-01-01T03:00:00Z', previousSampledAt: '2026-01-01T02:50:00Z', unusedPercentBeforeReset: 28, currentRemainingPercent: 99 };
+  assert.match(formatQuotaResetNotification(event).body, /重置前约剩余 28%/);
+  assert.match(formatQuotaResetNotification({ ...event, previousSampledAt: '2026-01-01T00:00:00Z' }).body, /最近已知剩余 28%.*无法精确确认重置瞬间余额/s);
 });
