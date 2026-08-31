@@ -30,7 +30,7 @@ export async function sendServerChan({ sendKey, title, body, fetchImpl = fetch, 
   try {
     const response = await fetchImpl(endpoint, {
       method: 'POST',
-      redirect: 'error',
+      redirect: 'manual',
       headers: {
         accept: 'application/json',
         'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',

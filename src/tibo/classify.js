@@ -44,6 +44,18 @@ export function classifyFeed(feed, { now = new Date(), maxAgeHours = 72 } = {}) 
   if (feed.stale === true) return [];
   const signals = [];
 
+  const upstreamSignal = feed.signal;
+  const upstreamSignalId = upstreamSignal?.active === true ? upstreamSignal?.tweet_id : null;
+  const upstreamSignalAt = safeDate(upstreamSignal?.at);
+  if (upstreamSignalId && withinAge(upstreamSignalAt, now, maxAgeHours)) {
+    signals.push(makeSignal({
+      phase: 'upcoming', id: upstreamSignalId, at: upstreamSignalAt,
+      text: upstreamSignal.summary, url: upstreamSignal.url, confidence: 0.95,
+      rationale: 'Upstream feed marks an active reset signal.',
+      source: 'codex-reset-feed'
+    }));
+  }
+
   for (const tweet of feed.tweets.slice(0, 40)) {
     const id = tweet?.id;
     const at = safeDate(tweet?.at ?? tweet?.declared_at);

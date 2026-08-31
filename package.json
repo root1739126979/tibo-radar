@@ -15,6 +15,9 @@
     "status": "node src/status.js",
     "sample": "node src/sample.js",
     "doctor": "node src/doctor.js",
-    "cloud:dry-run": "node src/cloud-monitor.js --dry-run"
+    "cloud:dry-run": "node src/cloudflare-dry-run.js",
+    "cloudflare:deploy": "npx --yes wrangler@4.127.1 deploy",
+    "cloudflare:dev": "npx --yes wrangler@4.127.1 dev --test-scheduled",
+    "cloudflare:tail": "npx --yes wrangler@4.127.1 tail"
   }
 }

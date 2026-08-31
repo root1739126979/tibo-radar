@@ -28,7 +28,7 @@ test('sends form data with no redirects and sanitizes the title', async () => {
   });
   assert.equal(result.pushId, 'p1');
   assert.equal(calls[0].url, `https://123456.push.ft07.com/send/${fakeKey}.send`);
-  assert.equal(calls[0].options.redirect, 'error');
+  assert.equal(calls[0].options.redirect, 'manual');
   assert.equal(calls[0].options.method, 'POST');
   assert.equal(calls[0].options.signal.constructor.name, 'AbortSignal');
   const form = new URLSearchParams(calls[0].options.body);

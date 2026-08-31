@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tibo-radar",
+  "main": "src/cloudflare-worker.js",
+  "compatibility_date": "2026-08-31",
+  "workers_dev": true,
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
+  "kv_namespaces": [
+    {
+      "binding": "TIBO_STATE",
+      "id": "2be214cf6f5e43bcabb4de35a3c6e0a7"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}

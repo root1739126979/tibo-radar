@@ -4,6 +4,50 @@ import { classifyFeed, classifyRunway, mergeSignals } from '../src/tibo/classify
 
 const now = new Date('2026-08-28T00:00:00Z');
 
+test('accepts the upstream active signal without reinterpreting its text', () => {
+  const signals = classifyFeed({
+    stale: false,
+    signal: {
+      tweet_id: '2094143054039183573',
+      at: '2026-08-30T19:19:46Z',
+      url: 'https://x.com/thsottiaux/status/2094143054039183573',
+      summary: 'Yes',
+      kind: 'signal',
+      active: true
+    },
+    tweets: [{
+      id: '2094143054039183573',
+      at: '2026-08-30T19:19:46Z',
+      url: 'https://x.com/thsottiaux/status/2094143054039183573',
+      text: 'Yes',
+      kind: 'signal',
+      tibo_lane: 'reset_related',
+      explicit_reset_claim: false
+    }]
+  }, { now: new Date('2026-08-30T19:25:00Z') });
+
+  assert.equal(signals.length, 1);
+  assert.equal(signals[0].phase, 'upcoming');
+  assert.equal(signals[0].key, 'upcoming:2094143054039183573');
+  assert.equal(signals[0].rationale, 'Upstream feed marks an active reset signal.');
+});
+
+test('does not emit an inactive or stale upstream signal', () => {
+  const base = {
+    stale: false,
+    signal: {
+      tweet_id: 'signal-1', at: '2026-08-30T19:19:46Z',
+      summary: 'Yes', kind: 'signal', active: false
+    },
+    tweets: []
+  };
+  assert.deepEqual(classifyFeed(base, { now: new Date('2026-08-30T19:25:00Z') }), []);
+  assert.deepEqual(classifyFeed({
+    ...base,
+    signal: { ...base.signal, active: true }
+  }, { now: new Date('2026-08-31T00:00:00Z'), maxAgeHours: 2 }), []);
+});
+
 test('classifies a semantic tease as an upcoming reset', () => {
   const signals = classifyFeed({ stale: false, tweets: [{
     id: 'hint-1', at: '2026-08-27T06:31:31Z', url: 'https://x.com/thsottiaux/status/hint-1',

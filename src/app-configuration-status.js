@@ -1,43 +1,24 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
+const HEALTH_URL = 'https://tibo-radar.sdcz900828.workers.dev/health';
 
-const execFileAsync = promisify(execFile);
-const REPOSITORY = 'root1739126979/tibo-radar';
-const SECRET_NAME = 'SERVERCHAN_SENDKEY';
-const WATERMARK_NAME = 'SERVERCHAN_ENABLED_AT';
-
-function parseList(stdout) {
-  const parsed = JSON.parse(String(stdout ?? ''));
-  if (!Array.isArray(parsed)) throw new Error('Unexpected GitHub CLI response');
-  return parsed;
-}
-
-export async function inspectCloudAppConfiguration({
-  execute = execFileAsync,
-  ghExecutable = process.platform === 'win32' ? 'gh.exe' : 'gh'
-} = {}) {
-  const options = {
-    windowsHide: true,
-    timeout: 10_000,
-    maxBuffer: 64 * 1024,
-    encoding: 'utf8',
-    shell: false
-  };
+export async function inspectCloudAppConfiguration({ fetchImpl = fetch } = {}) {
   try {
-    const [secretsResult, variablesResult] = await Promise.all([
-      execute(ghExecutable, ['secret', 'list', '--repo', REPOSITORY, '--json', 'name'], options),
-      execute(ghExecutable, ['variable', 'list', '--repo', REPOSITORY, '--json', 'name,value'], options)
-    ]);
-    const secrets = parseList(secretsResult.stdout);
-    const variables = parseList(variablesResult.stdout);
-    const watermark = variables.find((item) => item?.name === WATERMARK_NAME);
+    const response = await fetchImpl(HEALTH_URL, {
+      headers: { accept: 'application/json', 'user-agent': 'tibo-radar/1.0' },
+      redirect: 'error',
+      signal: AbortSignal.timeout(10_000)
+    });
+    if (!response.ok) throw new Error('Cloudflare health check failed');
+    const payload = await response.json();
+    if (payload?.ok !== true) throw new Error('Cloudflare health response is invalid');
+    const enableWatermarkExists = typeof payload.enabledAt === 'string';
     return {
-      secretExists: secrets.some((item) => item?.name === SECRET_NAME),
-      enableWatermarkExists: Boolean(watermark),
-      enableWatermarkValid: Boolean(watermark) && Number.isFinite(Date.parse(watermark.value ?? ''))
+      workerReachable: true,
+      configured: payload.configured === true,
+      enableWatermarkExists,
+      enableWatermarkValid: enableWatermarkExists && Number.isFinite(Date.parse(payload.enabledAt))
     };
   } catch {
-    throw new Error('Unable to read GitHub App configuration');
+    throw new Error('Unable to read Cloudflare App configuration');
   }
 }
 
@@ -46,7 +27,7 @@ export function summarizeAppConfiguration(localResult, cloudResult) {
   let cloud = '未知';
   if (cloudResult.ok) {
     const missing = [];
-    if (!cloudResult.value.secretExists) missing.push('缺少 Secret');
+    if (!cloudResult.value.workerReachable || !cloudResult.value.configured) missing.push('Worker 未配置');
     if (!cloudResult.value.enableWatermarkExists) missing.push('缺少启用水位');
     else if (!cloudResult.value.enableWatermarkValid) missing.push('启用水位无效');
     cloud = missing.length ? `未完成（${missing.join('、')}）` : '已配置';
