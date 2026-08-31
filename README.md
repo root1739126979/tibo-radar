@@ -41,9 +41,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\uninstall-windows-task.ps1
 
 ## 云端提醒
 
-Cloudflare Worker 每 5 分钟读取两个公开结构化信号源。`codex-reset.com` 顶层的 `signal.active` 是“即将重置”的主判据；推文语义只作为兼容旧数据的备用。Worker 使用 KV 保存启用水位、最近运行状态和已发送事件键，使用加密 Secret 保存 Server酱³ SendKey。首次运行只建立基线，不补发旧信号；发送失败不会写入已发送状态，下一次 Cron 会重试。云端不接触本机 Codex 凭据，也不调用模型。
+Cloudflare Worker 每 5 分钟读取两个公开结构化信号源。`codex-reset.com` 顶层的 `signal.active` 是“即将重置”的主判据；推文语义只作为兼容旧数据的备用。Worker 使用 KV 保存启用水位、最近运行状态和已发送事件键，使用加密 Secret 保存 Server酱³ SendKey。只有鉴权后的云端测试成功才会写入启用水位；在此之前 Cron 不读取信号源。发送失败不会写入已发送状态，下一次 Cron 会重试。云端不接触本机 Codex 凭据，也不调用模型。
 
-健康状态可以通过 `https://tibo-radar.sdcz900828.workers.dev/health` 查看。部署和日志命令：
+健康状态可以通过 `https://tibo-radar.sdcz900828.workers.dev/health` 查看；最近一次成功 Cron 超过 15 分钟或最近一次调度失败时会返回不健康。部署和日志命令：
 
 ```powershell
 npm run cloudflare:deploy
@@ -70,4 +70,4 @@ npm run doctor
 npm run cloud:dry-run
 ```
 
-运行依赖只有 Node.js 20+、已登录的 Codex CLI，以及 Windows 计划任务。代码不读取或上传 ChatGPT Cookie、访问令牌、对话内容或账号身份。
+日常运行依赖只有 Node.js 20+、已登录的 Codex CLI，以及 Windows 计划任务。首次部署或重新配置云端部分还需要网络、Cloudflare 账号和已登录的 Wrangler。代码不读取或上传 ChatGPT Cookie、访问令牌、对话内容或账号身份。

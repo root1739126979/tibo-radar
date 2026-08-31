@@ -40,9 +40,10 @@ function makeSignal({ phase, id, at, text, url, confidence, rationale, source })
 }
 
 export function classifyFeed(feed, { now = new Date(), maxAgeHours = 72 } = {}) {
-  if (!feed || !Array.isArray(feed.tweets)) return [];
+  if (!feed || typeof feed !== 'object') return [];
   if (feed.stale === true) return [];
   const signals = [];
+  const tweets = Array.isArray(feed.tweets) ? feed.tweets : [];
 
   const upstreamSignal = feed.signal;
   const upstreamSignalId = upstreamSignal?.active === true ? upstreamSignal?.tweet_id : null;
@@ -56,7 +57,7 @@ export function classifyFeed(feed, { now = new Date(), maxAgeHours = 72 } = {}) 
     }));
   }
 
-  for (const tweet of feed.tweets.slice(0, 40)) {
+  for (const tweet of tweets.slice(0, 40)) {
     const id = tweet?.id;
     const at = safeDate(tweet?.at ?? tweet?.declared_at);
     const text = String(tweet?.text ?? '');

@@ -32,6 +32,21 @@ test('accepts the upstream active signal without reinterpreting its text', () =>
   assert.equal(signals[0].rationale, 'Upstream feed marks an active reset signal.');
 });
 
+test('accepts the upstream active signal even when the tweet list is unavailable', () => {
+  const signals = classifyFeed({
+    stale: false,
+    signal: {
+      tweet_id: 'signal-without-tweets',
+      at: '2026-08-30T19:19:46Z',
+      summary: 'Yes',
+      active: true
+    }
+  }, { now: new Date('2026-08-30T19:25:00Z') });
+
+  assert.equal(signals.length, 1);
+  assert.equal(signals[0].key, 'upcoming:signal-without-tweets');
+});
+
 test('does not emit an inactive or stale upstream signal', () => {
   const base = {
     stale: false,

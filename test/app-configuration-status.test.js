@@ -9,6 +9,7 @@ test('cloud configuration reads only the fixed Cloudflare health endpoint', asyn
     return Response.json({
       ok: true,
       configured: true,
+      cronFresh: true,
       enabledAt: '2026-08-31T04:00:00.000Z'
     });
   };
@@ -16,6 +17,7 @@ test('cloud configuration reads only the fixed Cloudflare health endpoint', asyn
   assert.deepEqual(result, {
     workerReachable: true,
     configured: true,
+    cronHealthy: true,
     enableWatermarkExists: true,
     enableWatermarkValid: true
   });
@@ -24,16 +26,35 @@ test('cloud configuration reads only the fixed Cloudflare health endpoint', asyn
   assert.equal(calls[0].options.redirect, 'error');
 });
 
-test('full configuration requires local DPAPI, cloud Secret name, and a valid watermark', () => {
+test('full configuration requires local DPAPI, a healthy cloud cron, and a valid watermark', () => {
   assert.deepEqual(summarizeAppConfiguration(
     { ok: true, value: true },
-    { ok: true, value: { workerReachable: true, configured: true, enableWatermarkExists: true, enableWatermarkValid: true } }
+    { ok: true, value: { workerReachable: true, configured: true, cronHealthy: true, enableWatermarkExists: true, enableWatermarkValid: true } }
   ), { overall: '已配置', local: '已配置', cloud: '已配置' });
 
   assert.deepEqual(summarizeAppConfiguration(
     { ok: true, value: true },
-    { ok: true, value: { workerReachable: true, configured: false, enableWatermarkExists: false, enableWatermarkValid: false } }
+    { ok: true, value: { workerReachable: true, configured: false, cronHealthy: false, enableWatermarkExists: false, enableWatermarkValid: false } }
   ), { overall: '未完成', local: '已配置', cloud: '未完成（Worker 未配置、缺少启用水位）' });
+
+  assert.deepEqual(summarizeAppConfiguration(
+    { ok: true, value: true },
+    { ok: true, value: { workerReachable: true, configured: true, cronHealthy: false, enableWatermarkExists: true, enableWatermarkValid: true } }
+  ), { overall: '未完成', local: '已配置', cloud: '未完成（定时监控不健康）' });
+});
+
+test('an unhealthy response still reports configuration and cron state', async () => {
+  const result = await inspectCloudAppConfiguration({
+    fetchImpl: async () => Response.json({
+      ok: false,
+      configured: true,
+      cronFresh: false,
+      enabledAt: '2026-08-31T04:00:00.000Z'
+    }, { status: 503 })
+  });
+
+  assert.equal(result.configured, true);
+  assert.equal(result.cronHealthy, false);
 });
 
 test('a failed cloud health query reports unknown without hiding known local state', () => {

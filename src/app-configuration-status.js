@@ -7,13 +7,15 @@ export async function inspectCloudAppConfiguration({ fetchImpl = fetch } = {}) {
       redirect: 'error',
       signal: AbortSignal.timeout(10_000)
     });
-    if (!response.ok) throw new Error('Cloudflare health check failed');
     const payload = await response.json();
-    if (payload?.ok !== true) throw new Error('Cloudflare health response is invalid');
+    if (typeof payload?.ok !== 'boolean' || typeof payload?.configured !== 'boolean') {
+      throw new Error('Cloudflare health response is invalid');
+    }
     const enableWatermarkExists = typeof payload.enabledAt === 'string';
     return {
       workerReachable: true,
       configured: payload.configured === true,
+      cronHealthy: payload.ok === true && payload.cronFresh === true,
       enableWatermarkExists,
       enableWatermarkValid: enableWatermarkExists && Number.isFinite(Date.parse(payload.enabledAt))
     };
@@ -28,6 +30,7 @@ export function summarizeAppConfiguration(localResult, cloudResult) {
   if (cloudResult.ok) {
     const missing = [];
     if (!cloudResult.value.workerReachable || !cloudResult.value.configured) missing.push('Worker 未配置');
+    else if (!cloudResult.value.cronHealthy) missing.push('定时监控不健康');
     if (!cloudResult.value.enableWatermarkExists) missing.push('缺少启用水位');
     else if (!cloudResult.value.enableWatermarkValid) missing.push('启用水位无效');
     cloud = missing.length ? `未完成（${missing.join('、')}）` : '已配置';

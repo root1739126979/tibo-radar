@@ -44,19 +44,24 @@ test('a fresh upstream signal is delivered once and deduplicated in KV', async (
   assert.match(await kv.get('signal:upcoming:signal-1'), /"status":"sent"/);
 });
 
-test('the first run establishes a baseline without replaying an existing signal', async () => {
+test('a scheduled run stays disabled until the authenticated smoke test enables it', async () => {
   const kv = new MemoryKv();
   const sent = [];
+  let reads = 0;
   const result = await runCloudflareMonitor({
     env: { TIBO_STATE: kv, SERVERCHAN_SENDKEY: 'sctp123456tFAKE_secret' },
     now: () => new Date('2026-08-31T03:00:00.000Z'),
-    readSignals: async () => ({ signals: [upcoming()], warnings: [] }),
+    readSignals: async () => {
+      reads += 1;
+      return { signals: [upcoming()], warnings: [] };
+    },
     send: async (message) => sent.push(message)
   });
 
-  assert.equal(result.baselineEstablished, true);
+  assert.equal(result.enabled, false);
+  assert.equal(reads, 0);
   assert.deepEqual(sent, []);
-  assert.equal(await kv.get('monitor:enabled-at'), '2026-08-31T03:00:00.000Z');
+  assert.equal(await kv.get('monitor:enabled-at'), null);
 });
 
 test('a failed delivery is not marked sent and retries on the next cron run', async () => {

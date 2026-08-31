@@ -43,17 +43,17 @@ export async function runCloudflareMonitor({
 } = {}) {
   if (!env?.TIBO_STATE) throw new Error('TIBO_STATE KV binding is required');
   const checkedAt = now();
-  const { signals, warnings } = await readSignals({ maxAgeHours: 48 });
   const enabledValue = await env.TIBO_STATE.get(ENABLED_AT_KEY);
   const enabledAt = Date.parse(enabledValue ?? '');
 
   if (!Number.isFinite(enabledAt)) {
-    await env.TIBO_STATE.put(ENABLED_AT_KEY, checkedAt.toISOString());
     await env.TIBO_STATE.put(LAST_RUN_KEY, JSON.stringify({
-      checkedAt: checkedAt.toISOString(), baselineEstablished: true, warnings
+      checkedAt: checkedAt.toISOString(), enabled: false, delivered: 0, warnings: []
     }));
-    return { baselineEstablished: true, delivered: 0, warnings };
+    return { enabled: false, delivered: 0, warnings: [] };
   }
+
+  const { signals, warnings } = await readSignals({ maxAgeHours: 48 });
 
   let delivered = 0;
   for (const signal of signals) {
@@ -69,10 +69,11 @@ export async function runCloudflareMonitor({
   await env.TIBO_STATE.put(LAST_RUN_KEY, JSON.stringify({
     checkedAt: checkedAt.toISOString(), delivered, warnings
   }));
-  return { baselineEstablished: false, delivered, warnings };
+  return { enabled: true, delivered, warnings };
 }
 
 export const cloudflareStateKeys = {
   enabledAt: ENABLED_AT_KEY,
-  lastRun: LAST_RUN_KEY
+  lastRun: LAST_RUN_KEY,
+  lastFailure: 'monitor:last-failure'
 };
