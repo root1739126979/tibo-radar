@@ -33,8 +33,8 @@ function isFreshUpcoming(signal, now, enabledAt) {
   if (!Number.isFinite(signalTime)) return false;
   const age = now.getTime() - signalTime;
   const effectiveTime = Date.parse(signal.effectiveAt ?? '');
+  if (Number.isFinite(effectiveTime) && effectiveTime <= now.getTime()) return false;
   const hasPendingSchedule = Number.isFinite(effectiveTime)
-    && effectiveTime > now.getTime()
     && effectiveTime - now.getTime() <= ONE_DAY_MS;
   return signalTime >= enabledAt
     && age >= -5 * 60_000

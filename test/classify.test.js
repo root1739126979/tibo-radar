@@ -122,13 +122,16 @@ test('does not treat an unrelated product launch as a reset hint', () => {
 
 test('accepts an independently reported completed event and deduplicates by key', () => {
   const runway = classifyRunway({ monitor: { status: 'ok' }, events: [{
-    kind: 'reset_completed', announcedAt: '2026-08-27T16:35:05Z', confidence: 0.95,
+    kind: 'reset_completed', announcedAt: '2026-08-27T16:00:00Z',
+    effectiveAt: '2026-08-27T16:35:05Z', confidence: 0.95,
     source: { handle: 'thsottiaux', postId: 'done-1', url: 'https://x.com/thsottiaux/status/done-1' },
     text: 'Reset complete', rationale: 'Explicit announcement.'
   }] }, { now });
   const merged = mergeSignals(runway, [{ ...runway[0], confidence: 0.5 }]);
   assert.equal(merged.length, 1);
   assert.equal(merged[0].confidence, 0.95);
+  assert.equal(merged[0].announcedAt, '2026-08-27T16:00:00.000Z');
+  assert.equal(merged[0].effectiveAt, '2026-08-27T16:35:05.000Z');
 });
 
 test('classifies a structured tweet banked state without matching its wording', () => {
@@ -159,6 +162,7 @@ test('classifies a structured Runway schedule as one upcoming banked reset', () 
   assert.equal(signals.length, 1);
   assert.equal(signals[0].key, 'upcoming:2095651088502591861');
   assert.equal(signals[0].resetType, 'banked');
+  assert.equal(signals[0].announcedAt, '2026-09-03T23:12:09.000Z');
   assert.equal(signals[0].effectiveAt, '2026-09-04T02:12:09.000Z');
 });
 
@@ -178,6 +182,25 @@ test('merges the same scheduled post from both upstreams into one signal', () =>
   assert.equal(merged.length, 1);
   assert.equal(merged[0].key, 'upcoming:same-post');
   assert.equal(merged[0].source, 'codex-runway');
+});
+
+test('cross-source merge keeps structured details from the lower-confidence report', () => {
+  const id = 'active-and-banked';
+  const at = '2026-09-03T23:12:09Z';
+  const feed = classifyFeed({ stale: false, signal: {
+    active: true, tweet_id: id, at, summary: 'Yes'
+  }, tweets: [] }, { now: new Date('2026-09-04T00:52:00Z') });
+  const runway = classifyRunway({ monitor: { status: 'ok' }, events: [{
+    kind: 'reset_scheduled', resetType: 'banked', announcedAt: at,
+    effectiveAt: '2026-09-04T02:12:09Z', confidence: 0.93,
+    source: { handle: 'thsottiaux', postId: id }
+  }] }, { now: new Date('2026-09-04T00:52:00Z') });
+
+  const merged = mergeSignals(feed, runway);
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].confidence, 0.95);
+  assert.equal(merged[0].resetType, 'banked');
+  assert.equal(merged[0].effectiveAt, '2026-09-04T02:12:09.000Z');
 });
 
 test('accepts Runway nextSchedule when the event list has not caught up yet', () => {

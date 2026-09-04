@@ -94,6 +94,22 @@ test('an old schedule is not replayed after its effective time', async () => {
   assert.deepEqual(sent, []);
 });
 
+test('a recently announced schedule is not sent after its effective time', async () => {
+  const kv = new MemoryKv({ 'monitor:enabled-at': '2026-08-31T00:00:00.000Z' });
+  const sent = [];
+  await runCloudflareMonitor({
+    env: { TIBO_STATE: kv, SERVERCHAN_SENDKEY: 'sctp123456tFAKE_secret' },
+    now: () => new Date('2026-08-31T01:40:00.000Z'),
+    readSignals: async () => ({ signals: [upcoming({
+      at: '2026-08-31T01:00:00.000Z',
+      effectiveAt: '2026-08-31T01:30:00.000Z'
+    })], warnings: [] }),
+    send: async (message) => sent.push(message)
+  });
+
+  assert.deepEqual(sent, []);
+});
+
 test('a scheduled run stays disabled until the authenticated smoke test enables it', async () => {
   const kv = new MemoryKv();
   const sent = [];

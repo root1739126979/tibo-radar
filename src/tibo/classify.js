@@ -30,12 +30,13 @@ function confidenceNumber(value, fallback) {
   return { high: 0.95, medium: 0.85, low: 0.7 }[value] ?? fallback;
 }
 
-function makeSignal({ phase, id, at, effectiveAt = null, resetType = null, text, url, confidence, rationale, source }) {
+function makeSignal({ phase, id, at, announcedAt = null, effectiveAt = null, resetType = null, text, url, confidence, rationale, source }) {
   return {
     key: `${phase}:${id}`,
     phase,
     id: String(id),
     at,
+    announcedAt: announcedAt ?? at,
     effectiveAt,
     resetType,
     text: String(text ?? '').slice(0, 4_000),
@@ -137,7 +138,7 @@ export function classifyRunway(status, { now = new Date(), maxAgeHours = 72 } = 
     const at = phase === 'upcoming' ? announcedAt : (effectiveAt ?? announcedAt);
     if (!id || !withinAge(at, now, maxAgeHours)) continue;
     signals.push(makeSignal({
-      phase, id, at, effectiveAt, resetType: event.resetType ?? null,
+      phase, id, at, announcedAt, effectiveAt, resetType: event.resetType ?? null,
       text: event.text, url: event?.source?.url,
       confidence: Number.isFinite(event.confidence) ? event.confidence : 0.9,
       rationale: String(event.rationale ?? (phase === 'upcoming'
@@ -153,7 +154,21 @@ export function mergeSignals(...collections) {
   const merged = new Map();
   for (const signal of collections.flat()) {
     const existing = merged.get(signal.key);
-    if (!existing || signal.confidence > existing.confidence) merged.set(signal.key, signal);
+    if (!existing) {
+      merged.set(signal.key, signal);
+      continue;
+    }
+    const preferred = signal.confidence > existing.confidence ? signal : existing;
+    const supplement = preferred === signal ? existing : signal;
+    merged.set(signal.key, {
+      ...supplement,
+      ...preferred,
+      resetType: preferred.resetType ?? supplement.resetType ?? null,
+      announcedAt: preferred.announcedAt ?? supplement.announcedAt ?? preferred.at,
+      effectiveAt: preferred.effectiveAt ?? supplement.effectiveAt ?? null,
+      url: preferred.url ?? supplement.url ?? null,
+      text: preferred.text || supplement.text || ''
+    });
   }
   return [...merged.values()].sort((left, right) => Date.parse(left.at) - Date.parse(right.at));
 }
