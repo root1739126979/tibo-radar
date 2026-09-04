@@ -2,6 +2,7 @@ import { sendServerChan } from './serverchan.js';
 import { readLiveSignals } from './tibo/live-signals.js';
 
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const ENABLED_AT_KEY = 'monitor:enabled-at';
 const LAST_RUN_KEY = 'monitor:last-run';
 
@@ -11,9 +12,12 @@ function signalKey(signal) {
 
 function tiboMessage(signal) {
   return {
-    title: 'Tibo 即将进行重置',
+    title: signal.resetType === 'banked'
+      ? 'Tibo 即将发放 Banked Reset'
+      : 'Tibo 即将进行重置',
     body: [
       `信号时间：${signal.at}`,
+      signal.effectiveAt ? `预计生效：${signal.effectiveAt}` : null,
       `置信度：${Math.round(signal.confidence * 100)}%`,
       `判断依据：${signal.rationale}`,
       '',
@@ -28,7 +32,13 @@ function isFreshUpcoming(signal, now, enabledAt) {
   const signalTime = Date.parse(signal.at ?? '');
   if (!Number.isFinite(signalTime)) return false;
   const age = now.getTime() - signalTime;
-  return signalTime >= enabledAt && age >= -5 * 60_000 && age <= TWO_HOURS_MS;
+  const effectiveTime = Date.parse(signal.effectiveAt ?? '');
+  const hasPendingSchedule = Number.isFinite(effectiveTime)
+    && effectiveTime > now.getTime()
+    && effectiveTime - now.getTime() <= ONE_DAY_MS;
+  return signalTime >= enabledAt
+    && age >= -5 * 60_000
+    && (age <= TWO_HOURS_MS || hasPendingSchedule);
 }
 
 export async function runCloudflareMonitor({

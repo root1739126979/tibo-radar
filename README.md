@@ -19,9 +19,10 @@ npm run status
 配置程序会依次发送 `[本机测试]` 和 `[云端测试]` 两条通知，并把 SendKey 写入 Cloudflare Worker Secret。全部成功后才启用正式通知：
 
 - `Tibo 即将进行重置`；
+- `Tibo 即将发放 Banked Reset`；
 - `你的周配额已经重置`，并按样本新鲜度说明重置前未用额度。
 
-"Tibo 已经进行了重置"、历史信号、超过两小时的旧信号和正常心跳不会推送。重新双击配置入口可安全替换密钥。App 临时失败时，本机事件保留在待发送队列；Cloudflare 信号会在后续 Cron 中重试。
+"Tibo 已经进行了重置"、已过期的历史信号和正常心跳不会推送。重新双击配置入口可安全替换密钥。App 临时失败时，本机事件保留在待发送队列；Cloudflare 信号会在后续 Cron 中重试。
 
 ## 本地 10 分钟监控
 
@@ -41,7 +42,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\uninstall-windows-task.ps1
 
 ## 云端提醒
 
-Cloudflare Worker 每 5 分钟读取两个公开结构化信号源。`codex-reset.com` 顶层的 `signal.active` 是“即将重置”的主判据；推文语义只作为兼容旧数据的备用。Worker 使用 KV 保存启用水位、最近运行状态和已发送事件键，使用加密 Secret 保存 Server酱³ SendKey。只有鉴权后的云端测试成功才会写入启用水位；在此之前 Cron 不读取信号源。发送失败不会写入已发送状态，下一次 Cron 会重试。云端不接触本机 Codex 凭据，也不调用模型。
+Cloudflare Worker 每 5 分钟读取两个公开结构化信号源。它接收 `codex-reset.com` 的活动信号、Banked Reset 状态与事件，以及 `codexrunway.com` 的 `reset_scheduled` 和 `resetTimeline.nextSchedule`；推文语义只作为兼容旧数据的备用。所有结果按提醒阶段和原推文 ID 归一化，同一事件被两个上游同时报告时只推送一次。Worker 使用 KV 保存启用水位、最近运行状态和已发送事件键，使用加密 Secret 保存 Server酱³ SendKey。只有鉴权后的云端测试成功才会写入启用水位；在此之前 Cron 不读取信号源。发送失败不会写入已发送状态，下一次 Cron 会重试。云端不接触本机 Codex 凭据，也不调用模型。
 
 健康状态可以通过 `https://tibo-radar.sdcz900828.workers.dev/health` 查看；最近一次成功 Cron 超过 15 分钟或最近一次调度失败时会返回不健康。部署和日志命令：
 

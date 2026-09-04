@@ -25,12 +25,19 @@ function withinAge(isoDate, now, maxAgeHours) {
   return age >= -5 * 60_000 && age <= maxAgeHours * 3_600_000;
 }
 
-function makeSignal({ phase, id, at, text, url, confidence, rationale, source }) {
+function confidenceNumber(value, fallback) {
+  if (Number.isFinite(value)) return value;
+  return { high: 0.95, medium: 0.85, low: 0.7 }[value] ?? fallback;
+}
+
+function makeSignal({ phase, id, at, effectiveAt = null, resetType = null, text, url, confidence, rationale, source }) {
   return {
     key: `${phase}:${id}`,
     phase,
     id: String(id),
     at,
+    effectiveAt,
+    resetType,
     text: String(text ?? '').slice(0, 4_000),
     url: typeof url === 'string' && url.startsWith('https://') ? url : null,
     confidence,
@@ -57,6 +64,24 @@ export function classifyFeed(feed, { now = new Date(), maxAgeHours = 72 } = {}) 
     }));
   }
 
+  const events = Array.isArray(feed.events) ? feed.events : [];
+  for (const event of events.slice(0, 80)) {
+    const isUpcomingBankedReset = event?.type === 'credits'
+      && event?.reset_kind === 'banked'
+      && (event?.banked_state === 'announced' || event?.banked_state === 'arriving');
+    if (!isUpcomingBankedReset) continue;
+    const id = event.id;
+    const at = safeDate(event.announced_at);
+    if (!id || !withinAge(at, now, maxAgeHours)) continue;
+    signals.push(makeSignal({
+      phase: 'upcoming', id, at, effectiveAt: safeDate(event.effective_at),
+      resetType: 'banked', text: event.summary, url: event.url,
+      confidence: confidenceNumber(event.confidence, 0.85),
+      rationale: `Feed marks a banked reset as ${event.banked_state}.`,
+      source: 'codex-reset-feed'
+    }));
+  }
+
   for (const tweet of tweets.slice(0, 40)) {
     const id = tweet?.id;
     const at = safeDate(tweet?.at ?? tweet?.declared_at);
@@ -67,6 +92,7 @@ export function classifyFeed(feed, { now = new Date(), maxAgeHours = 72 } = {}) 
     const textHasResetContext = /\b(?:codex|chatgpt work|usage|quota|rate limits?|reset button|everyone|all paid|brand new usage)\b/i.test(text);
     const explicit = tweet.explicit_reset_claim === true
       || (!/\?\s*$/.test(text) && (laneIsRelevant || textHasResetContext) && COMPLETED_PATTERNS.some((pattern) => pattern.test(text)));
+    const bankedUpcoming = tweet.banked_state === 'announced' || tweet.banked_state === 'arriving';
     const teasing = tweet?.tease_classification?.teasing === true
       || ((laneIsRelevant || textHasResetContext) && UPCOMING_PATTERNS.some((pattern) => pattern.test(text)));
 
@@ -76,10 +102,16 @@ export function classifyFeed(feed, { now = new Date(), maxAgeHours = 72 } = {}) 
         rationale: tweet.explicit_reset_claim === true ? 'Tibo feed marks an explicit reset claim.' : 'Deterministic completed-reset wording.',
         source: 'codex-reset-feed'
       }));
-    } else if (teasing) {
+    } else if (bankedUpcoming || teasing) {
       signals.push(makeSignal({
-        phase: 'upcoming', id, at, text, url: tweet.url, confidence: tweet?.tease_classification?.teasing === true ? 0.92 : 0.8,
-        rationale: tweet?.tease_classification?.teasing === true ? 'Feed semantic classifier marks this as a reset tease.' : 'Deterministic future-reset wording.',
+        phase: 'upcoming', id, at, resetType: bankedUpcoming ? 'banked' : null,
+        text, url: tweet.url,
+        confidence: bankedUpcoming ? 0.9 : (tweet?.tease_classification?.teasing === true ? 0.92 : 0.8),
+        rationale: bankedUpcoming
+          ? `Feed marks a tweet's banked reset as ${tweet.banked_state}.`
+          : (tweet?.tease_classification?.teasing === true
+              ? 'Feed semantic classifier marks this as a reset tease.'
+              : 'Deterministic future-reset wording.'),
         source: 'codex-reset-feed'
       }));
     }
@@ -88,24 +120,33 @@ export function classifyFeed(feed, { now = new Date(), maxAgeHours = 72 } = {}) 
 }
 
 export function classifyRunway(status, { now = new Date(), maxAgeHours = 72 } = {}) {
-  if (!status || !Array.isArray(status.events) || status?.monitor?.status !== 'ok') return [];
+  if (!status || status?.monitor?.status !== 'ok') return [];
   const signals = [];
-  for (const event of status.events.slice(0, 20)) {
-    if (event?.kind !== 'reset_completed') continue;
+  const events = Array.isArray(status.events) ? status.events.slice(0, 20) : [];
+  const nextSchedule = status?.resetTimeline?.nextSchedule;
+  if (nextSchedule && typeof nextSchedule === 'object') events.push(nextSchedule);
+  for (const event of events) {
+    if (event?.kind !== 'reset_scheduled' && event?.kind !== 'reset_completed') continue;
     const isTiboSource = event?.source?.handle === 'thsottiaux'
       || String(event?.source?.url ?? '').startsWith('https://x.com/thsottiaux/');
     if (!isTiboSource) continue;
     const id = event?.source?.postId ?? event?.source?.origin;
-    const at = safeDate(event?.effectiveAt ?? event?.announcedAt);
+    const phase = event.kind === 'reset_scheduled' ? 'upcoming' : 'completed';
+    const announcedAt = safeDate(event?.announcedAt);
+    const effectiveAt = safeDate(event?.effectiveAt);
+    const at = phase === 'upcoming' ? announcedAt : (effectiveAt ?? announcedAt);
     if (!id || !withinAge(at, now, maxAgeHours)) continue;
     signals.push(makeSignal({
-      phase: 'completed', id, at, text: event.text, url: event?.source?.url,
+      phase, id, at, effectiveAt, resetType: event.resetType ?? null,
+      text: event.text, url: event?.source?.url,
       confidence: Number.isFinite(event.confidence) ? event.confidence : 0.9,
-      rationale: String(event.rationale ?? 'Independent reset-completed event.'),
+      rationale: String(event.rationale ?? (phase === 'upcoming'
+        ? 'Independent reset schedule.'
+        : 'Independent reset-completed event.')),
       source: 'codex-runway'
     }));
   }
-  return signals;
+  return mergeSignals(signals);
 }
 
 export function mergeSignals(...collections) {

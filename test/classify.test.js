@@ -63,6 +63,27 @@ test('does not emit an inactive or stale upstream signal', () => {
   }, { now: new Date('2026-08-31T00:00:00Z'), maxAgeHours: 2 }), []);
 });
 
+test('classifies a structured Feed banked-reset announcement without reading its wording', () => {
+  const signals = classifyFeed({
+    stale: false,
+    signal: { active: false },
+    tweets: [],
+    events: [{
+      id: 'banked-1',
+      announced_at: '2026-09-03T23:12:09Z',
+      effective_at: '2026-09-04T02:12:09Z',
+      type: 'credits', group: 'credits', reset_kind: 'banked',
+      banked_state: 'announced', confidence: 'medium',
+      summary: 'Unrelated wording that contains no reset keyword.',
+      url: 'https://x.com/thsottiaux/status/banked-1'
+    }]
+  }, { now: new Date('2026-09-04T00:52:00Z') });
+
+  assert.equal(signals.length, 1);
+  assert.equal(signals[0].key, 'upcoming:banked-1');
+  assert.equal(signals[0].resetType, 'banked');
+});
+
 test('classifies a semantic tease as an upcoming reset', () => {
   const signals = classifyFeed({ stale: false, tweets: [{
     id: 'hint-1', at: '2026-08-27T06:31:31Z', url: 'https://x.com/thsottiaux/status/hint-1',
@@ -108,6 +129,71 @@ test('accepts an independently reported completed event and deduplicates by key'
   const merged = mergeSignals(runway, [{ ...runway[0], confidence: 0.5 }]);
   assert.equal(merged.length, 1);
   assert.equal(merged[0].confidence, 0.95);
+});
+
+test('classifies a structured tweet banked state without matching its wording', () => {
+  const signals = classifyFeed({ stale: false, tweets: [{
+    id: 'banked-tweet', at: '2026-08-27T23:00:00Z',
+    text: 'An intentionally opaque announcement.',
+    banked_state: 'arriving', explicit_reset_claim: false
+  }] }, { now });
+
+  assert.equal(signals.length, 1);
+  assert.equal(signals[0].phase, 'upcoming');
+  assert.equal(signals[0].resetType, 'banked');
+});
+
+test('classifies a structured Runway schedule as one upcoming banked reset', () => {
+  const signals = classifyRunway({ monitor: { status: 'ok' }, events: [{
+    kind: 'reset_scheduled', resetType: 'banked',
+    announcedAt: '2026-09-03T23:12:09Z', effectiveAt: '2026-09-04T02:12:09Z',
+    confidence: 0.93,
+    source: {
+      handle: 'thsottiaux', postId: '2095651088502591861',
+      url: 'https://x.com/thsottiaux/status/2095651088502591861'
+    },
+    text: 'First banked reset will land in about three hours.',
+    rationale: 'Explicit Codex reset-bank credit schedule.'
+  }] }, { now: new Date('2026-09-04T00:52:00Z') });
+
+  assert.equal(signals.length, 1);
+  assert.equal(signals[0].key, 'upcoming:2095651088502591861');
+  assert.equal(signals[0].resetType, 'banked');
+  assert.equal(signals[0].effectiveAt, '2026-09-04T02:12:09.000Z');
+});
+
+test('merges the same scheduled post from both upstreams into one signal', () => {
+  const id = 'same-post';
+  const at = '2026-09-03T23:12:09Z';
+  const feed = classifyFeed({ stale: false, tweets: [], events: [{
+    id, announced_at: at, type: 'credits', reset_kind: 'banked',
+    banked_state: 'announced', confidence: 'medium'
+  }] }, { now: new Date('2026-09-04T00:52:00Z') });
+  const runway = classifyRunway({ monitor: { status: 'ok' }, events: [{
+    kind: 'reset_scheduled', resetType: 'banked', announcedAt: at,
+    confidence: 0.93, source: { handle: 'thsottiaux', postId: id }
+  }] }, { now: new Date('2026-09-04T00:52:00Z') });
+
+  const merged = mergeSignals(feed, runway);
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].key, 'upcoming:same-post');
+  assert.equal(merged[0].source, 'codex-runway');
+});
+
+test('accepts Runway nextSchedule when the event list has not caught up yet', () => {
+  const signals = classifyRunway({
+    monitor: { status: 'ok' },
+    events: [],
+    resetTimeline: { nextSchedule: {
+      kind: 'reset_scheduled', resetType: 'global',
+      announcedAt: '2026-09-03T23:12:09Z', effectiveAt: '2026-09-04T02:12:09Z',
+      confidence: 0.91,
+      source: { handle: 'thsottiaux', postId: 'next-only' }
+    } }
+  }, { now: new Date('2026-09-04T00:52:00Z') });
+
+  assert.equal(signals.length, 1);
+  assert.equal(signals[0].key, 'upcoming:next-only');
 });
 
 test('ignores operator-only runway events because the requested source is Tibo', () => {
