@@ -11,12 +11,20 @@ export function detectQuotaReset(previous, current) {
   const usedDrop = previous.usedPercent - current.usedPercent;
   const previousResetAt = timestamp(previous.resetsAt);
   const currentResetAt = timestamp(current.resetsAt);
+  const previousSampledAt = timestamp(previous.sampledAt);
+  const currentSampledAt = timestamp(current.sampledAt);
   const resetTimeShiftMinutes = previousResetAt === null || currentResetAt === null
     ? 0
     : (currentResetAt - previousResetAt) / MINUTE_MS;
+  const sampleGapMinutes = previousSampledAt === null || currentSampledAt === null || currentSampledAt < previousSampledAt
+    ? null
+    : (currentSampledAt - previousSampledAt) / MINUTE_MS;
+  const resetTimeLeadMinutes = sampleGapMinutes === null
+    ? 0
+    : resetTimeShiftMinutes - sampleGapMinutes;
 
   const largeUsageDrop = usedDrop >= 10 && current.usedPercent <= 5;
-  const shiftedWindow = resetTimeShiftMinutes >= 30 && current.usedPercent <= 5 && usedDrop >= 0;
+  const shiftedWindow = resetTimeLeadMinutes >= 30 && current.usedPercent <= 5 && usedDrop >= 0;
   if (!largeUsageDrop && !shiftedWindow) return null;
 
   return {

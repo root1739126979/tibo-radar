@@ -43,6 +43,13 @@ test('does not misclassify a ten-minute sliding reset timestamp', () => {
   ), null);
 });
 
+test('does not misclassify a sliding reset timestamp after missed samples', () => {
+  assert.equal(detectQuotaReset(
+    { sampledAt: '2026-09-04T04:08:12.813Z', usedPercent: 0, remainingPercent: 100, resetsAt: '2026-09-11T04:08:10Z' },
+    { sampledAt: '2026-09-04T04:45:37.407Z', usedPercent: 0, remainingPercent: 100, resetsAt: '2026-09-11T04:45:36Z' }
+  ), null);
+});
+
 test('describes a fresh pre-reset sample as approximate and an old one as last known', () => {
   const event = { detectedAt: '2026-01-01T03:00:00Z', previousSampledAt: '2026-01-01T02:50:00Z', unusedPercentBeforeReset: 28, currentRemainingPercent: 99 };
   assert.match(formatQuotaResetNotification(event).body, /重置前约剩余 28%/);
