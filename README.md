@@ -12,6 +12,8 @@ npm run status
 
 输出包括当前周配额、最近 Tibo 信号、最近一次真实重置、计划任务健康、App 配置状态、待发送数量和最近脱敏错误。单项检查失败会显示“未知”，不会掩盖其余状态。
 
+给其他 AI 接入只读配额查询：[配额查询说明](docs/quota-query.md)，包含已实测的 JSON 查询命令和 App Server 协议。
+
 ## Server酱³ App 通知
 
 先在手机登录 Server酱³ App 并取得 `sctp...` SendKey，然后双击 `配置App通知.cmd`。在隐藏输入提示中粘贴一次密钥；不要把 SendKey 发到聊天或写进配置文件。
